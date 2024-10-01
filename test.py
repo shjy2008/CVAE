@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import time
 import pandas as pd
-from tensorflow.keras.datasets import fashion_mnist, mnist
+import os
 
 # (mn_x_train, _), (mn_x_test, _) = mnist.load_data()
 # mn_x_train = mn_x_train.astype('float32') / 255.
@@ -160,6 +160,8 @@ class CVAE_trainer():
 
     def train(self, epochs):
         # self.generate_random_and_save(0)
+        if os.path.exists(MODEL_SAVE_PATH):
+            self.load_model()
 
         for epoch in range(1, epochs + 1):
             start_time = time.time()
