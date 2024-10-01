@@ -31,7 +31,7 @@ x_test = x_test.reshape(-1, 28, 28)
 x_test = x_test.astype('float32') / 255.
 x_test = x_test[..., tf.newaxis]
 
-
+vowels = [0, 4, 8, 14, 20]
 
 # (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
 # x_train = x_train.astype('float32') / 255.
@@ -61,9 +61,10 @@ class CVAE(tf.keras.Model):
     def __init__(self, **kwargs):
         super(CVAE, self).__init__(**kwargs)
         self.latent_dim = 128
+        self.num_classes = 26
         self.encoder = tf.keras.Sequential(
             [
-                tf.keras.layers.InputLayer(shape=(28, 28, 1 + 26)),
+                tf.keras.layers.InputLayer(shape=(28, 28, 1 + self.num_classes)),
                 tf.keras.layers.Conv2D(
                     filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.BatchNormalization(),
@@ -81,7 +82,7 @@ class CVAE(tf.keras.Model):
 
         self.decoder = tf.keras.Sequential(
             [
-                tf.keras.layers.InputLayer(shape=(self.latent_dim + 26,)),
+                tf.keras.layers.InputLayer(shape=(self.latent_dim + self.num_classes,)),
                 tf.keras.layers.Dense(units=7*7*self.latent_dim, activation=tf.nn.relu),
                 tf.keras.layers.Reshape(target_shape=(7, 7, self.latent_dim)),
                 tf.keras.layers.Conv2DTranspose(
@@ -100,8 +101,8 @@ class CVAE(tf.keras.Model):
         return self.decode(eps, labels, apply_sigmoid=True)
 
     def encode(self, x, y):
-        y_one_hot = tf.one_hot(y, depth=26)
-        y_one_hot = tf.reshape(y_one_hot, [-1, 1, 1, 26])
+        y_one_hot = tf.one_hot(y, depth=self.num_classes)
+        y_one_hot = tf.reshape(y_one_hot, [-1, 1, 1, self.num_classes])
         y_one_hot = tf.tile(y_one_hot, [1, 28, 28, 1])
         x_cond = tf.concat([x, y_one_hot], axis=-1)
         mean, logvar = tf.split(self.encoder(x_cond), num_or_size_splits=2, axis=1)
@@ -112,7 +113,7 @@ class CVAE(tf.keras.Model):
         return eps * tf.exp(logvar * .5) + mean
 
     def decode(self, z, y, apply_sigmoid=False):
-        y_one_hot = tf.one_hot(y, depth=26)
+        y_one_hot = tf.one_hot(y, depth=self.num_classes)
         z_cond = tf.concat([z, y_one_hot], axis=1)
         logits = self.decoder(z_cond)
         if apply_sigmoid:
@@ -162,6 +163,7 @@ class CVAE_trainer():
         # self.generate_random_and_save(0)
         if os.path.exists(MODEL_SAVE_PATH):
             self.load_model()
+            print ("Load previous model success")
 
         for epoch in range(1, epochs + 1):
             start_time = time.time()
@@ -188,9 +190,9 @@ class CVAE_trainer():
             generated_image = self.cvae.sample(label)
             generated_images.append(generated_image[0])
 
-        fig = plt.figure(figsize=(13, 5))
+        fig = plt.figure(figsize=(13, 10))
         for i in range(num_examples):
-            plt.subplot(2, 13, i + 1)
+            plt.subplot(5, 6, i + 1)
             plt.imshow(generated_images[i][:, :, 0], cmap='gray')
             plt.title(f'Label: {i}')
             plt.axis('off')
