@@ -3,13 +3,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import time
 import pandas as pd
-
-# (x_train, _), (x_test, _) = fashion_mnist.load_data()
-# x_train = x_train.astype('float32') / 255.
-# x_test = x_test.astype('float32') / 255.
-
-# x_train = x_train[..., tf.newaxis]
-# x_test = x_test[..., tf.newaxis]
+from tensorflow.keras.datasets import fashion_mnist, mnist
 
 # (mn_x_train, _), (mn_x_test, _) = mnist.load_data()
 # mn_x_train = mn_x_train.astype('float32') / 255.
@@ -20,10 +14,12 @@ import pandas as pd
 
 # print(x_train.shape)
 
+MODEL_SAVE_PATH = "myModel.keras"
+
 # Load the CSV file
 train_data_csv = pd.read_csv('sign_mnist_train.csv')
-y_train = train_data_csv.iloc[:, 0].values[:100]
-x_train = train_data_csv.iloc[:, 1:].values[:100]
+y_train = train_data_csv.iloc[:, 0].values#[:100]
+x_train = train_data_csv.iloc[:, 1:].values#[:100]
 x_train = x_train.reshape(-1, 28, 28)
 x_train = x_train.astype('float32') / 255.
 x_train = x_train[..., tf.newaxis]
@@ -34,6 +30,18 @@ x_test = test_data_csv.iloc[:, 1:].values
 x_test = x_test.reshape(-1, 28, 28)
 x_test = x_test.astype('float32') / 255.
 x_test = x_test[..., tf.newaxis]
+
+
+
+# (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+# x_train = x_train.astype('float32') / 255.
+# x_test = x_test.astype('float32') / 255.
+
+# x_train = x_train[..., tf.newaxis]
+# x_test = x_test[..., tf.newaxis]
+
+# x_train = x_train[0:100]
+# y_train = y_train[0:100]
 
 
 
@@ -50,16 +58,21 @@ def log_normal_pdf(sample, mean, logvar, raxis=1):
 class CVAE(tf.keras.Model):
     """Conditional Convolutional variational autoencoder."""
 
-    def __init__(self):
-        super(CVAE, self).__init__()
-        self.latent_dim = 64
+    def __init__(self, **kwargs):
+        super(CVAE, self).__init__(**kwargs)
+        self.latent_dim = 128
         self.encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(shape=(28, 28, 1 + 26)),
                 tf.keras.layers.Conv2D(
-                    filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+                    filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
+                tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Conv2D(
                     filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
+                tf.keras.layers.BatchNormalization(),
+                tf.keras.layers.Conv2D(
+                    filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+                tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Flatten(),
                 # No activation
                 tf.keras.layers.Dense(self.latent_dim + self.latent_dim),
@@ -69,35 +82,19 @@ class CVAE(tf.keras.Model):
         self.decoder = tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(shape=(self.latent_dim + 26,)),
-                tf.keras.layers.Dense(units=7*7*32, activation=tf.nn.relu),
-                tf.keras.layers.Reshape(target_shape=(7, 7, 32)),
+                tf.keras.layers.Dense(units=7*7*self.latent_dim, activation=tf.nn.relu),
+                tf.keras.layers.Reshape(target_shape=(7, 7, self.latent_dim)),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=64, kernel_size=3, strides=2, padding='same',
-                    activation='relu'),
+                    filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=128, kernel_size=3, strides=2, padding='same',
-                    activation='relu'),
+                    filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
                 # No activation
                 tf.keras.layers.Conv2DTranspose(
                     filters=1, kernel_size=3, strides=1, padding='same'),
             ]
         )
 
-    def get_config(self):
-        config = super(CVAE, self).get_config()
-        config.update({
-            'latent_dim': self.latent_dim
-        })
-        return config
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
-    
-    # @tf.function
     def sample(self, label):
-            # z = tf.random.normal((1, self.latent_dim))
-            # labels = tf.constant([label], dtype=tf.int32)
         eps = tf.random.normal((1, self.latent_dim))
         labels = tf.constant([label], dtype=tf.int32)
         return self.decode(eps, labels, apply_sigmoid=True)
@@ -124,9 +121,8 @@ class CVAE(tf.keras.Model):
         return logits
 
 
-class CVAE_trainer():
 
-    MODEL_SAVE_PATH = "myModel.h5"
+class CVAE_trainer():
 
     def __init__(self, train_images, train_labels, test_images, test_labels, batch_size=256):
         self.cvae = CVAE()
@@ -187,9 +183,7 @@ class CVAE_trainer():
         num_examples = 26
         generated_images = []
         for label in range(num_examples):
-            # z = tf.random.normal((1, self.latent_dim))
-            # labels = tf.constant([label], dtype=tf.int32)
-            generated_image = self.cvae.sample(label) #self.cvae.decode(z, labels, apply_sigmoid=True)
+            generated_image = self.cvae.sample(label)
             generated_images.append(generated_image[0])
 
         fig = plt.figure(figsize=(13, 5))
@@ -203,16 +197,15 @@ class CVAE_trainer():
         plt.close()
 
     def save_model(self):
-        self.cvae.save(self.MODEL_SAVE_PATH)
+        self.cvae.save(MODEL_SAVE_PATH)
     
     def load_model(self):
-        self.cvae.load_model(self.MODEL_SAVE_PATH)
+        self.cvae = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
 trainer = CVAE_trainer(x_train, y_train, x_test, y_test)
-# trainer.train(epochs=50)
-# trainer.generate_and_save_images(1)
+trainer.train(epochs=50)
 
-with tf.keras.utils.custom_object_scope({'CVAE': CVAE}):
-    aaa = tf.keras.models.load_model("myModel.keras")
-# trainer.generate_and_save_images(1)
+# with tf.keras.utils.custom_object_scope({'CVAE': CVAE}):
+#     trainer.load_model()
+#     trainer.generate_and_save_images(1)
