@@ -78,7 +78,7 @@ class CVAE(tf.keras.Model):
 
     def __init__(self, **kwargs):
         super(CVAE, self).__init__(**kwargs)
-        self.latent_dim = 256
+        self.latent_dim = 512
         self.num_classes = 26
         self.encoder = tf.keras.Sequential(
             [
@@ -104,10 +104,10 @@ class CVAE(tf.keras.Model):
                 tf.keras.layers.Dense(units=7*7*self.latent_dim, activation=tf.nn.relu),
                 tf.keras.layers.Reshape(target_shape=(7, 7, self.latent_dim)),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=256, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    filters=128, kernel_size=3, strides=2, padding='same', activation='relu'),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=128, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
                 # tf.keras.layers.Conv2DTranspose(
                 #     filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
                 # No activation
