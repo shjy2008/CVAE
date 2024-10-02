@@ -5,15 +5,6 @@ import time
 import pandas as pd
 import os
 
-# (mn_x_train, _), (mn_x_test, _) = mnist.load_data()
-# mn_x_train = mn_x_train.astype('float32') / 255.
-# mn_x_test = mn_x_test.astype('float32') / 255.
-
-# mn_x_train = mn_x_train[..., tf.newaxis]
-# mn_x_test = mn_x_test[..., tf.newaxis]
-
-# print(x_train.shape)
-
 MODEL_SAVE_PATH = "myModel.keras"
 
 # Load the CSV file
@@ -33,16 +24,43 @@ x_test = x_test[..., tf.newaxis]
 
 vowels = [0, 4, 8, 14, 20]
 
-# (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
-# x_train = x_train.astype('float32') / 255.
-# x_test = x_test.astype('float32') / 255.
+def create_rotated_data(x, y):
+    rotated_x = []
+    rotated_y = []
+    for i in range(len(x)):
+        image = x[i]
+        rotated_x.append(image)
+        rotated_y.append(0)
+        for rotate_90_num in range(1, 4): # 1: 90, 2: 180, 3: 270
+            rotated_image = tf.image.rot90(image, k = rotate_90_num)
+            rotated_x.append(rotated_image)
+            rotated_y.append(rotate_90_num)
 
-# x_train = x_train[..., tf.newaxis]
-# x_test = x_test[..., tf.newaxis]
+    rotated_x = np.array(rotated_x)
+    rotated_y = np.array(rotated_y)
+    return (rotated_x, rotated_y)
 
-# x_train = x_train[0:100]
-# y_train = y_train[0:100]
+rotated_train_data_path = 'rotated_train_data.npz'
+rotated_test_data_path = 'rotated_test_data.npz'
 
+if os.path.exists(rotated_train_data_path) and os.path.exists(rotated_test_data_path):
+    print("Local rotated data exists, do not need to create")
+    rotated_train_data = np.load(rotated_train_data_path)
+    rotated_x_train = rotated_train_data['x']
+    rotated_y_train = rotated_train_data['y']
+
+    rotated_test_data = np.load(rotated_test_data_path)
+    rotated_x_test = rotated_test_data['x']
+    rotated_y_test = rotated_test_data['y']
+else:
+    print("Creating local rotated data...")
+    rotated_x_train, rotated_y_train = create_rotated_data(x_train, y_train)
+    rotated_x_test, rotated_y_test = create_rotated_data(x_test, y_test)
+
+    np.savez('rotated_train_data.npz', x=rotated_x_train, y=rotated_y_train)
+    np.savez('rotated_test_data.npz', x=rotated_x_test, y=rotated_y_test)
+
+    print("Finish creating local rotated data")
 
 
 def log_normal_pdf(sample, mean, logvar, raxis=1):
@@ -60,19 +78,19 @@ class CVAE(tf.keras.Model):
 
     def __init__(self, **kwargs):
         super(CVAE, self).__init__(**kwargs)
-        self.latent_dim = 128
+        self.latent_dim = 256
         self.num_classes = 26
         self.encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(shape=(28, 28, 1 + self.num_classes)),
                 tf.keras.layers.Conv2D(
-                    filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
-                tf.keras.layers.BatchNormalization(),
-                tf.keras.layers.Conv2D(
                     filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Conv2D(
                     filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+                tf.keras.layers.BatchNormalization(),
+                tf.keras.layers.Conv2D(
+                    filters=256, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Flatten(),
                 # No activation
@@ -86,9 +104,12 @@ class CVAE(tf.keras.Model):
                 tf.keras.layers.Dense(units=7*7*self.latent_dim, activation=tf.nn.relu),
                 tf.keras.layers.Reshape(target_shape=(7, 7, self.latent_dim)),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    filters=256, kernel_size=3, strides=2, padding='same', activation='relu'),
+                tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=32, kernel_size=3, strides=2, padding='same', activation='relu'),
+                    filters=128, kernel_size=3, strides=2, padding='same', activation='relu'),
+                # tf.keras.layers.Conv2DTranspose(
+                #     filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
                 # No activation
                 tf.keras.layers.Conv2DTranspose(
                     filters=1, kernel_size=3, strides=1, padding='same'),
@@ -205,6 +226,11 @@ class CVAE_trainer():
     
     def load_model(self):
         self.cvae = tf.keras.models.load_model(MODEL_SAVE_PATH)
+
+
+# Train rotated data
+# trainer = CVAE_trainer(rotated_x_train, rotated_y_train, rotated_x_test, rotated_y_test)
+# trainer.train(epochs=50)
 
 
 trainer = CVAE_trainer(x_train, y_train, x_test, y_test)
