@@ -6,13 +6,13 @@ import pandas as pd
 import os
 
 # ----------- Modify this -------------
-is_training = False # Set to True if want to train
-generate_letter = 'C' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
+is_training = True # Set to True if want to train
+generate_vowel = True # True(or 1): Vowel, False(or 0): Consonant
 #--------------------------------------
 
-MODEL_SAVE_PATH = "myModel_task2.keras"
+MODEL_SAVE_PATH = "myModel_task1.keras"
 
-NUM_CLASSES = 24
+NUM_CLASSES = 2
 
 all_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # 26 letters
 letters = "ABCDEFGHIKLMNOPQRSTUVWXY" # only 24 letters, except J and Z
@@ -46,9 +46,9 @@ x_test = x_test.reshape(-1, 28, 28)
 x_test = x_test.astype('float32') / 255.
 x_test = x_test[..., tf.newaxis]
 
-# Convert label to index
-y_train = np.array([label_to_index(label) for label in y_train])
-y_test = np.array([label_to_index(label) for label in y_test])
+# Convert label to 0(consonant) or 1(vowel)
+y_train = np.array([1 if is_label_a_vowel(label) else 0 for label in y_train])
+y_test = np.array([1 if is_label_a_vowel(label) else 0 for label in y_test])
 
 def log_normal_pdf(sample, mean, logvar, raxis=1):
     """
@@ -217,7 +217,8 @@ class CVAE_trainer():
         for i in range(num_examples):
             plt.subplot(5, 6, i + 1)
             plt.imshow(generated_images[i][:, :, 0], cmap='gray')
-            plt.title(f'Letter: {index_to_letter(i)}')
+            title = "Vowel" if i > 0 else "Consonant"
+            plt.title(f'{title}')
             plt.axis('off')
 
         plt.savefig(f'generated_images_epoch_{epoch:04d}.png')
@@ -230,34 +231,30 @@ class CVAE_trainer():
         self.cvae = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
-def generate_image_with_letter(letter):
-    letter = letter.upper()
-    if letter in letters:
-        myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
-        index = letter_to_index(letter)
+def generate_image_vowel_or_consonant(is_vowel):
+    myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+    y = 1 if is_vowel else 0
 
-        num_examples = 24
-        generated_images = []
-        for i in range(num_examples):
-            generated_image = myModel.sample(index)
-            generated_images.append(generated_image[0])
+    num_examples = 24
+    generated_images = []
+    for i in range(num_examples):
+        generated_image = myModel.sample(y)
+        generated_images.append(generated_image[0])
 
-        fig = plt.figure(figsize=(15, 9))
-        for i in range(num_examples):
-            plt.subplot(4, 6, i + 1)
-            plt.imshow(generated_images[i][:, :, 0], cmap='gray')
-            plt.title(f'Letter: {letter}')
-            plt.axis('off')
+    fig = plt.figure(figsize=(15, 9))
+    for i in range(num_examples):
+        plt.subplot(4, 6, i + 1)
+        plt.imshow(generated_images[i][:, :, 0], cmap='gray')
+        title = "Vowel"if is_vowel else "Consonant"
+        plt.title(title)
+        plt.axis('off')
 
-        plt.savefig(f'generated_{letter}.png')
-        # plt.close()
-        plt.show()
-    else:
-        print (f"Input wrong, please try again. Valid input: {letters}")
-
+    plt.savefig(f'generated_{title}.png')
+    # plt.close()
+    plt.show()
 
 if is_training:
     trainer = CVAE_trainer(x_train, y_train, x_test, y_test)
     trainer.train(epochs=50)
 else:
-    generate_image_with_letter(generate_letter)
+    generate_image_vowel_or_consonant(generate_vowel)
