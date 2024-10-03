@@ -33,8 +33,8 @@ def is_label_a_vowel(label):
 
 # Load the CSV file
 train_data_csv = pd.read_csv('sign_mnist_train.csv')
-y_train = train_data_csv.iloc[:, 0].values#[:100]
-x_train = train_data_csv.iloc[:, 1:].values#[:100]
+y_train = train_data_csv.iloc[:, 0].values
+x_train = train_data_csv.iloc[:, 1:].values
 x_train = x_train.reshape(-1, 28, 28)
 x_train = x_train.astype('float32') / 255.
 x_train = x_train[..., tf.newaxis]
@@ -186,7 +186,7 @@ class CVAE_trainer():
         # self.generate_random_and_save(0)
         if os.path.exists(MODEL_SAVE_PATH):
             self.load_model()
-            print ("Load previous model success")
+            print ("Load previous model success, continue to train based on the previous model")
 
         for epoch in range(1, epochs + 1):
             start_time = time.time()
@@ -207,17 +207,17 @@ class CVAE_trainer():
             self.save_model()
 
     def generate_and_save_images(self, epoch):
-        num_examples = NUM_CLASSES
+        num_examples = 24
         generated_images = []
-        for label in range(num_examples):
-            generated_image = self.cvae.sample(label)
+        for i in range(num_examples):
+            generated_image = self.cvae.sample(i % NUM_CLASSES)
             generated_images.append(generated_image[0])
 
         fig = plt.figure(figsize=(13, 10))
         for i in range(num_examples):
             plt.subplot(5, 6, i + 1)
             plt.imshow(generated_images[i][:, :, 0], cmap='gray')
-            title = "Vowel" if i > 0 else "Consonant"
+            title = "Vowel" if i % NUM_CLASSES > 0 else "Consonant"
             plt.title(f'{title}')
             plt.axis('off')
 
@@ -241,9 +241,9 @@ def generate_image_vowel_or_consonant(is_vowel):
         generated_image = myModel.sample(y)
         generated_images.append(generated_image[0])
 
-    fig = plt.figure(figsize=(15, 9))
+    fig = plt.figure(figsize=(13, 10))
     for i in range(num_examples):
-        plt.subplot(4, 6, i + 1)
+        plt.subplot(5, 6, i + 1)
         plt.imshow(generated_images[i][:, :, 0], cmap='gray')
         title = "Vowel"if is_vowel else "Consonant"
         plt.title(title)
