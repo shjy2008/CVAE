@@ -5,24 +5,14 @@ import time
 import pandas as pd
 import os
 
-MODEL_SAVE_PATH = "myModel.keras"
+# ----------- Modify this -------------
+is_training = False # Set to True if want to train
+generate_letter = 'C' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
+#--------------------------------------
 
-# Load the CSV file
-train_data_csv = pd.read_csv('sign_mnist_train.csv')
-y_train = train_data_csv.iloc[:, 0].values#[:100]
-x_train = train_data_csv.iloc[:, 1:].values#[:100]
-x_train = x_train.reshape(-1, 28, 28)
-x_train = x_train.astype('float32') / 255.
-x_train = x_train[..., tf.newaxis]
+MODEL_SAVE_PATH = "myModel_letter.keras"
 
-test_data_csv = pd.read_csv('sign_mnist_test.csv')
-y_test = test_data_csv.iloc[:, 0].values
-x_test = test_data_csv.iloc[:, 1:].values
-x_test = x_test.reshape(-1, 28, 28)
-x_test = x_test.astype('float32') / 255.
-x_test = x_test[..., tf.newaxis]
-
-vowels = [0, 4, 8, 14, 20]
+NUM_CLASSES = 24
 
 all_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # 26 letters
 letters = "ABCDEFGHIKLMNOPQRSTUVWXY" # only 24 letters, except J and Z
@@ -41,44 +31,24 @@ def label_to_index(label):
 def is_label_a_vowel(label):
     return all_letters[label] in vowels
 
-def create_rotated_data(x, y):
-    rotated_x = []
-    rotated_y = []
-    for i in range(len(x)):
-        image = x[i]
-        rotated_x.append(image)
-        rotated_y.append(0)
-        for rotate_90_num in range(1, 4): # 1: 90, 2: 180, 3: 270
-            rotated_image = tf.image.rot90(image, k = rotate_90_num)
-            rotated_x.append(rotated_image)
-            rotated_y.append(rotate_90_num)
+# Load the CSV file
+train_data_csv = pd.read_csv('sign_mnist_train.csv')
+y_train = train_data_csv.iloc[:, 0].values#[:100]
+x_train = train_data_csv.iloc[:, 1:].values#[:100]
+x_train = x_train.reshape(-1, 28, 28)
+x_train = x_train.astype('float32') / 255.
+x_train = x_train[..., tf.newaxis]
 
-    rotated_x = np.array(rotated_x)
-    rotated_y = np.array(rotated_y)
-    return (rotated_x, rotated_y)
+test_data_csv = pd.read_csv('sign_mnist_test.csv')
+y_test = test_data_csv.iloc[:, 0].values
+x_test = test_data_csv.iloc[:, 1:].values
+x_test = x_test.reshape(-1, 28, 28)
+x_test = x_test.astype('float32') / 255.
+x_test = x_test[..., tf.newaxis]
 
-rotated_train_data_path = 'rotated_train_data.npz'
-rotated_test_data_path = 'rotated_test_data.npz'
-
-if os.path.exists(rotated_train_data_path) and os.path.exists(rotated_test_data_path):
-    print("Local rotated data exists, do not need to create")
-    rotated_train_data = np.load(rotated_train_data_path)
-    rotated_x_train = rotated_train_data['x']
-    rotated_y_train = rotated_train_data['y']
-
-    rotated_test_data = np.load(rotated_test_data_path)
-    rotated_x_test = rotated_test_data['x']
-    rotated_y_test = rotated_test_data['y']
-else:
-    print("Creating local rotated data...")
-    rotated_x_train, rotated_y_train = create_rotated_data(x_train, y_train)
-    rotated_x_test, rotated_y_test = create_rotated_data(x_test, y_test)
-
-    np.savez('rotated_train_data.npz', x=rotated_x_train, y=rotated_y_train)
-    np.savez('rotated_test_data.npz', x=rotated_x_test, y=rotated_y_test)
-
-    print("Finish creating local rotated data")
-
+# Convert label to index
+y_train = np.array([label_to_index(label) for label in y_train])
+y_test = np.array([label_to_index(label) for label in y_test])
 
 def log_normal_pdf(sample, mean, logvar, raxis=1):
     """
@@ -96,7 +66,7 @@ class CVAE(tf.keras.Model):
     def __init__(self, **kwargs):
         super(CVAE, self).__init__(**kwargs)
         self.latent_dim = 512
-        self.num_classes = 26
+        self.num_classes = NUM_CLASSES
         self.encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(shape=(28, 28, 1 + self.num_classes)),
@@ -222,7 +192,7 @@ class CVAE_trainer():
             self.save_model()
 
     def generate_and_save_images(self, epoch):
-        num_examples = 26
+        num_examples = NUM_CLASSES
         generated_images = []
         for label in range(num_examples):
             generated_image = self.cvae.sample(label)
@@ -232,7 +202,7 @@ class CVAE_trainer():
         for i in range(num_examples):
             plt.subplot(5, 6, i + 1)
             plt.imshow(generated_images[i][:, :, 0], cmap='gray')
-            plt.title(f'Label: {i}')
+            plt.title(f'Letter: {index_to_letter(i)}')
             plt.axis('off')
 
         plt.savefig(f'generated_images_epoch_{epoch:04d}.png')
@@ -245,14 +215,34 @@ class CVAE_trainer():
         self.cvae = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
-# Train rotated data
-# trainer = CVAE_trainer(rotated_x_train, rotated_y_train, rotated_x_test, rotated_y_test)
-# trainer.train(epochs=50)
+def generate_image_with_letter(letter):
+    letter = letter.upper()
+    if letter in letters:
+        myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+        index = letter_to_index(letter)
+
+        num_examples = 24
+        generated_images = []
+        for i in range(num_examples):
+            generated_image = myModel.sample(index)
+            generated_images.append(generated_image[0])
+
+        fig = plt.figure(figsize=(15, 9))
+        for i in range(num_examples):
+            plt.subplot(4, 6, i + 1)
+            plt.imshow(generated_images[i][:, :, 0], cmap='gray')
+            plt.title(f'Letter: {letter}')
+            plt.axis('off')
+
+        plt.savefig(f'generated_{letter}.png')
+        # plt.close()
+        plt.show()
+    else:
+        print (f"Input wrong, please try again. Valid input: {letters}")
 
 
-trainer = CVAE_trainer(x_train, y_train, x_test, y_test)
-trainer.train(epochs=50)
-
-# with tf.keras.utils.custom_object_scope({'CVAE': CVAE}):
-#     trainer.load_model()
-#     trainer.generate_and_save_images(1)
+if is_training:
+    trainer = CVAE_trainer(x_train, y_train, x_test, y_test)
+    trainer.train(epochs=50)
+else:
+    generate_image_with_letter(generate_letter)
