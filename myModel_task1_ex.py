@@ -49,8 +49,8 @@ x_test = x_test.astype('float32') / 255.
 x_test = x_test[..., tf.newaxis]
 
 # Convert label to 0(consonant) or 1(vowel)
-y_train = np.array([1 if is_label_a_vowel(label) else 0 for label in y_train])
-y_test = np.array([1 if is_label_a_vowel(label) else 0 for label in y_test])
+y_train_is_vowel = np.array([1 if is_label_a_vowel(label) else 0 for label in y_train])
+y_test_is_vowel = np.array([1 if is_label_a_vowel(label) else 0 for label in y_test])
 
 # Convert label to index
 y_train_letter_indexes = np.array([label_to_index(label) for label in y_train])
@@ -109,10 +109,13 @@ class CVAE(tf.keras.Model):
             ]
         )
 
-    def sample(self, y):
+    def sample(self, is_vowel, letter_index = None):
         eps = tf.random.normal((1, self.latent_dim))
-        y = tf.constant([y], dtype=tf.int32)
-        return self.decode(eps, y, None, apply_sigmoid=True)
+        if is_vowel != None:
+            is_vowel = tf.constant([is_vowel], dtype=tf.int32)
+        if letter_index != None:
+            letter_index = tf.constant([letter_index], dtype=tf.int32)
+        return self.decode(eps, is_vowel, letter_index, apply_sigmoid=True)
 
     def encode(self, x, y, y_letter_index = None):
         if self.num_classes > 2:
@@ -145,13 +148,23 @@ class CVAE(tf.keras.Model):
         return eps * tf.exp(logvar * .5) + mean
 
     def decode(self, z, y, y_letter_index = None, apply_sigmoid=False):
-        if self.num_classes > 2:
-            y_one_hot = tf.one_hot(y, depth=self.num_classes)
-            z_cond = tf.concat([z, y_one_hot], axis=1)
+        if y != None:
+            if self.num_classes > 2:
+                y_one_hot = tf.one_hot(y, depth=self.num_classes)
+                z_cond = tf.concat([z, y_one_hot], axis=1)
+            else:
+                y = tf.cast(y, dtype=tf.float32)
+                y = tf.reshape(y, [-1, 1])
+                z_cond = tf.concat([z, y], axis=1)
         else:
-            y = tf.cast(y, dtype=tf.float32)
-            y = tf.reshape(y, [-1, 1])
-            z_cond = tf.concat([z, y], axis=1)
+            # If y is None, check the number of classes
+            if self.num_classes > 2:
+                padding = tf.zeros([tf.shape(z)[0], self.num_classes])
+                z_cond = tf.concat([z, padding], axis=-1)
+            else:
+                # Pad with a single zero if there are only 2 classes (binary)
+                padding = tf.zeros([tf.shape(z)[0], 1])
+                z_cond = tf.concat([z, padding], axis=-1)
 
         if y_letter_index != None:
             y_letter_one_hot = tf.one_hot(y_letter_index, depth=NUM_CLASSES_LETTERS)
@@ -277,7 +290,36 @@ def generate_image_vowel_or_consonant(is_vowel):
     plt.show()
 
 if is_training:
-    trainer = CVAE_trainer(x_train, y_train, y_train_letter_indexes, x_test, y_test)
+    trainer = CVAE_trainer(x_train, y_train_is_vowel, y_train_letter_indexes, x_test, y_test_is_vowel)
     trainer.train(epochs=50)
 else:
     generate_image_vowel_or_consonant(generate_vowel)
+
+
+def generate_image_with_letter(letter):
+    letter = letter.upper()
+    if letter in letters:
+        myModel = tf.keras.models.load_model(MODEL_SAVE_PATH)
+        index = letter_to_index(letter)
+
+        num_examples = 24
+        generated_images = []
+        for i in range(num_examples):
+            generated_image = myModel.sample(None, index)
+            generated_images.append(generated_image[0])
+
+        fig = plt.figure(figsize=(13, 10))
+        for i in range(num_examples):
+            plt.subplot(5, 6, i + 1)
+            plt.imshow(generated_images[i][:, :, 0], cmap='gray')
+            plt.title(f'Letter: {letter}')
+            plt.axis('off')
+
+        plt.savefig(f'generated_{letter}.png')
+        # plt.close()
+        plt.show()
+    else:
+        print (f"Input value invalid, please try again. Valid input: {letters}")
+
+# generate_image_vowel_or_consonant(True)
+# generate_image_with_letter("b")
