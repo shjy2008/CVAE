@@ -6,8 +6,8 @@ import pandas as pd
 import os
 
 # ----------- Modify this -------------
-is_training = True # Set to True if want to train
-generate_rotation_angle = 180 # Valid values: 0, 90, 180, 270
+is_training = False # Set to True if want to train
+generate_rotation_angle = 90 # Valid values: 0, 90, 180, 270
 #--------------------------------------
 
 MODEL_SAVE_PATH = "myModel_task3.keras"
@@ -290,7 +290,7 @@ def generate_image_with_angle(angle):
         plt.title(title)
         plt.axis('off')
 
-    plt.savefig(f'generated_{title}.png')
+    plt.savefig(f'generated_rotation_{angle}.png')
     # plt.close()
     plt.show()
 
