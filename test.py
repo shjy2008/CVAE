@@ -84,13 +84,13 @@ class CVAE(tf.keras.Model):
             [
                 tf.keras.layers.InputLayer(shape=(28, 28, 1 + self.num_classes)),
                 tf.keras.layers.Conv2D(
+                    filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
+                tf.keras.layers.BatchNormalization(),
+                tf.keras.layers.Conv2D(
                     filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Conv2D(
                     filters=128, kernel_size=3, strides=(2, 2), activation='relu'),
-                tf.keras.layers.BatchNormalization(),
-                tf.keras.layers.Conv2D(
-                    filters=256, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Flatten(),
                 # No activation
@@ -148,7 +148,7 @@ class CVAE_trainer():
 
     def __init__(self, train_images, train_labels, test_images, test_labels, batch_size=256):
         self.cvae = CVAE()
-        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate = 1e-3)
         # self.num_examples_to_generate = 16
         # self.seed = tf.random.normal([self.num_examples_to_generate, self.latent_dim])
         self.batch_size = batch_size
