@@ -5,22 +5,24 @@ import time
 import pandas as pd
 import os
 
-# ----------- Modify this -------------
+# ------- Please modify this ----------
 is_training = False # Set to True if want to train
 generate_letter = 'C' # Valid value: ABCDEFGHIKLMNOPQRSTUVWXY (No J and Z)
 #--------------------------------------
 
 MODEL_SAVE_PATH = "myModel_task2.keras"
 
-NUM_CLASSES = 24
+NUM_CLASSES = 24 # only 24 letters, except J and Z
 
 all_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # 26 letters
 letters = "ABCDEFGHIKLMNOPQRSTUVWXY" # only 24 letters, except J and Z
 vowels = "AEIOU"
 
+# index: (0-23) in letters (except J and Z)
 def index_to_letter(index):
     return letters[index]
 
+# index: (0-23) in letters (except J and Z)
 def letter_to_index(letter):
     return letters.index(letter)
 
@@ -28,6 +30,7 @@ def letter_to_index(letter):
 def label_to_index(label):
     return letter_to_index(all_letters[label])
 
+# label: the label in the csv table, 0-24 but doesn't have 9
 def is_label_a_vowel(label):
     return all_letters[label] in vowels
 
@@ -125,6 +128,7 @@ class CVAE(tf.keras.Model):
         mean, logvar = tf.split(self.encoder(x_cond), num_or_size_splits=2, axis=1)
         return mean, logvar
 
+    # Reparameterization trick
     def reparameterize(self, mean, logvar):
         eps = tf.random.normal(shape=mean.shape)
         return eps * tf.exp(logvar * .5) + mean
@@ -151,8 +155,6 @@ class CVAE_trainer():
     def __init__(self, train_images, train_labels, test_images, test_labels, batch_size=256):
         self.cvae = CVAE()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate = 1e-3)
-        # self.num_examples_to_generate = 16
-        # self.seed = tf.random.normal([self.num_examples_to_generate, self.latent_dim])
         self.batch_size = batch_size
         self.train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels)).shuffle(train_images.shape[0]).batch(self.batch_size)
         self.test_dataset = (tf.data.Dataset.from_tensor_slices((test_images, test_labels)).shuffle(test_images.shape[0]).batch(self.batch_size))
@@ -183,7 +185,6 @@ class CVAE_trainer():
 
 
     def train(self, epochs):
-        # self.generate_random_and_save(0)
         if os.path.exists(MODEL_SAVE_PATH):
             self.load_model()
             print ("Load previous model success, continue to train based on the previous model")
@@ -198,14 +199,13 @@ class CVAE_trainer():
             for test_x, test_y in self.test_dataset:
                 loss(self.compute_loss(test_x, test_y))
             elbo = -loss.result()
-            # display.clear_output(wait=False)
             print('Epoch: {}, Test set ELBO: {}, time elapse for current epoch: {}'
                 .format(epoch, elbo, end_time - start_time))
-            # self.generate_random_and_save(epoch)
             self.generate_and_save_images(epoch)
 
             self.save_model()
 
+    # Generate images to see the result after each epoch
     def generate_and_save_images(self, epoch):
         num_examples = NUM_CLASSES
         generated_images = []
@@ -230,6 +230,7 @@ class CVAE_trainer():
         self.cvae = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
 
+# Given a specific letter ('A', 'B', 'C', ..), generate images
 def generate_image_with_letter(letter):
     letter = letter.upper()
     if letter in letters:
@@ -250,14 +251,14 @@ def generate_image_with_letter(letter):
             plt.axis('off')
 
         plt.savefig(f'generated_{letter}.png')
-        # plt.close()
         plt.show()
     else:
         print (f"Input value invalid, please try again. Valid input: {letters}")
 
 
+# If is training, create a trainer to train the model
 if is_training:
     trainer = CVAE_trainer(x_train, y_train, x_test, y_test)
     trainer.train(epochs=50)
-else:
+else: # If not, only generate images with existing model
     generate_image_with_letter(generate_letter)

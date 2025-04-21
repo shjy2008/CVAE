@@ -5,23 +5,25 @@ import time
 import pandas as pd
 import os
 
-# ----------- Modify this -------------
+# ------- Please modify this ----------
 is_training = False # Set to True if want to train
 generate_rotation_angle = 90 # Valid values: 0, 90, 180, 270
 #--------------------------------------
 
 MODEL_SAVE_PATH = "myModel_task3.keras"
 
-NUM_CLASSES = 4
+angles = [0, 90, 180, 270]
+
+NUM_CLASSES = 4  # 4 angles
 
 all_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" # 26 letters
 letters = "ABCDEFGHIKLMNOPQRSTUVWXY" # only 24 letters, except J and Z
 
-angles = [0, 90, 180, 270]
-
+# index: (0-23) in letters (except J and Z)
 def index_to_letter(index):
     return letters[index]
 
+# index: (0-23) in letters (except J and Z)
 def letter_to_index(letter):
     return letters.index(letter)
 
@@ -48,44 +50,46 @@ def create_rotated_data(x, y):
 rotated_train_data_path = 'rotated_train_data.npz'
 rotated_test_data_path = 'rotated_test_data.npz'
 
-if os.path.exists(rotated_train_data_path) and os.path.exists(rotated_test_data_path):
-    print("Local rotated data exists, do not need to create")
-    rotated_train_data = np.load(rotated_train_data_path)
-    rotated_x_train = rotated_train_data['x']
-    rotated_y_train = rotated_train_data['y']
+if is_training:
+    # If the rotated data already exists, only need to load the data
+    if os.path.exists(rotated_train_data_path) and os.path.exists(rotated_test_data_path):
+        print("Local rotated data exists, do not need to create")
+        rotated_train_data = np.load(rotated_train_data_path)
+        rotated_x_train = rotated_train_data['x']
+        rotated_y_train = rotated_train_data['y']
 
-    rotated_test_data = np.load(rotated_test_data_path)
-    rotated_x_test = rotated_test_data['x']
-    rotated_y_test = rotated_test_data['y']
-else:
-    print("Creating local rotated data...")
+        rotated_test_data = np.load(rotated_test_data_path)
+        rotated_x_test = rotated_test_data['x']
+        rotated_y_test = rotated_test_data['y']
+    else: # If not exists, create a new data
+        print("Creating local rotated data...")
 
-    # Load the CSV file
-    train_data_csv = pd.read_csv('sign_mnist_train.csv')
-    y_train = train_data_csv.iloc[:, 0].values
-    x_train = train_data_csv.iloc[:, 1:].values
-    x_train = x_train.reshape(-1, 28, 28)
-    x_train = x_train.astype('float32') / 255.
-    x_train = x_train[..., tf.newaxis]
+        # Load the CSV file
+        train_data_csv = pd.read_csv('sign_mnist_train.csv')
+        y_train = train_data_csv.iloc[:, 0].values
+        x_train = train_data_csv.iloc[:, 1:].values
+        x_train = x_train.reshape(-1, 28, 28)
+        x_train = x_train.astype('float32') / 255.
+        x_train = x_train[..., tf.newaxis]
 
-    test_data_csv = pd.read_csv('sign_mnist_test.csv')
-    y_test = test_data_csv.iloc[:, 0].values
-    x_test = test_data_csv.iloc[:, 1:].values
-    x_test = x_test.reshape(-1, 28, 28)
-    x_test = x_test.astype('float32') / 255.
-    x_test = x_test[..., tf.newaxis]
+        test_data_csv = pd.read_csv('sign_mnist_test.csv')
+        y_test = test_data_csv.iloc[:, 0].values
+        x_test = test_data_csv.iloc[:, 1:].values
+        x_test = x_test.reshape(-1, 28, 28)
+        x_test = x_test.astype('float32') / 255.
+        x_test = x_test[..., tf.newaxis]
 
-    # Convert label to index
-    y_train = np.array([label_to_index(label) for label in y_train])
-    y_test = np.array([label_to_index(label) for label in y_test])
+        # Convert label to index
+        y_train = np.array([label_to_index(label) for label in y_train])
+        y_test = np.array([label_to_index(label) for label in y_test])
 
-    rotated_x_train, rotated_y_train = create_rotated_data(x_train, y_train)
-    rotated_x_test, rotated_y_test = create_rotated_data(x_test, y_test)
+        rotated_x_train, rotated_y_train = create_rotated_data(x_train, y_train)
+        rotated_x_test, rotated_y_test = create_rotated_data(x_test, y_test)
 
-    np.savez('rotated_train_data.npz', x=rotated_x_train, y=rotated_y_train)
-    np.savez('rotated_test_data.npz', x=rotated_x_test, y=rotated_y_test)
+        np.savez('rotated_train_data.npz', x=rotated_x_train, y=rotated_y_train)
+        np.savez('rotated_test_data.npz', x=rotated_x_test, y=rotated_y_test)
 
-    print("Finish creating local rotated data")
+        print("Finish creating local rotated data")
 
 def log_normal_pdf(sample, mean, logvar, raxis=1):
     """
@@ -133,8 +137,6 @@ class CVAE(tf.keras.Model):
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.Conv2DTranspose(
                     filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
-                # tf.keras.layers.Conv2DTranspose(
-                #     filters=64, kernel_size=3, strides=2, padding='same', activation='relu'),
                 # No activation
                 tf.keras.layers.Conv2DTranspose(
                     filters=1, kernel_size=3, strides=1, padding='same'),
@@ -162,6 +164,7 @@ class CVAE(tf.keras.Model):
         mean, logvar = tf.split(self.encoder(x_cond), num_or_size_splits=2, axis=1)
         return mean, logvar
 
+    # Reparameterization trick
     def reparameterize(self, mean, logvar):
         eps = tf.random.normal(shape=mean.shape)
         return eps * tf.exp(logvar * .5) + mean
@@ -188,8 +191,6 @@ class CVAE_trainer():
     def __init__(self, train_images, train_labels, test_images, test_labels, batch_size=256):
         self.cvae = CVAE()
         self.optimizer = tf.keras.optimizers.Adam(learning_rate = 1e-3)
-        # self.num_examples_to_generate = 16
-        # self.seed = tf.random.normal([self.num_examples_to_generate, self.latent_dim])
         self.batch_size = batch_size
         self.train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels)).shuffle(train_images.shape[0]).batch(self.batch_size)
         self.test_dataset = (tf.data.Dataset.from_tensor_slices((test_images, test_labels)).shuffle(test_images.shape[0]).batch(self.batch_size))
@@ -220,7 +221,6 @@ class CVAE_trainer():
 
 
     def train(self, epochs):
-        # self.generate_random_and_save(0)
         if os.path.exists(MODEL_SAVE_PATH):
             self.load_model()
             print ("Load previous model success, continue to train based on the previous model")
@@ -235,26 +235,25 @@ class CVAE_trainer():
             for test_x, test_y in self.test_dataset:
                 loss(self.compute_loss(test_x, test_y))
             elbo = -loss.result()
-            # display.clear_output(wait=False)
             print('Epoch: {}, Test set ELBO: {}, time elapse for current epoch: {}'
                 .format(epoch, elbo, end_time - start_time))
-            # self.generate_random_and_save(epoch)
             self.generate_and_save_images(epoch)
 
             self.save_model()
 
+    # Generate images to see the result after each epoch
     def generate_and_save_images(self, epoch):
         num_examples = 24
         generated_images = []
-        for i in range(num_examples):
-            generated_image = self.cvae.sample(i % NUM_CLASSES)
-            generated_images.append(generated_image[0])
-
         fig = plt.figure(figsize=(13, 10))
         for i in range(num_examples):
+            angle_index = (int)(i / (num_examples / NUM_CLASSES)) # 0-5 -> 0, 6-11 -> 1, ...
+            generated_image = self.cvae.sample(angle_index)
+            generated_images.append(generated_image[0])
+
             plt.subplot(5, 6, i + 1)
             plt.imshow(generated_images[i][:, :, 0], cmap='gray')
-            title = f"Angle: {angles[i % NUM_CLASSES]}"
+            title = f"Angle: {angles[angle_index]}"
             plt.title(f'{title}')
             plt.axis('off')
 
@@ -267,7 +266,7 @@ class CVAE_trainer():
     def load_model(self):
         self.cvae = tf.keras.models.load_model(MODEL_SAVE_PATH)
 
-
+# Given an angle (0, 90, 180, 270), produce images
 def generate_image_with_angle(angle):
     if angle not in angles:
         print (f"Input value invalid, please try again. Valid input: {angles}")
@@ -291,11 +290,12 @@ def generate_image_with_angle(angle):
         plt.axis('off')
 
     plt.savefig(f'generated_rotation_{angle}.png')
-    # plt.close()
     plt.show()
 
+
+# If is training, create a trainer to train the model
 if is_training:
     trainer = CVAE_trainer(rotated_x_train, rotated_y_train, rotated_x_test, rotated_y_test)
     trainer.train(epochs=50)
-else:
+else: # If not, only generate images with existing model
     generate_image_with_angle(generate_rotation_angle)
