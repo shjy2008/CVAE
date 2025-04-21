@@ -1,0 +1,49 @@
+# Student: 
+ 
+# Marks
+ 
+| Task | Mark | Out Of |
+| ------- | ---: | :--- |
+| Implementation    | 10 | / 10 |
+| Report            | 10 | / 10 |
+| Total             | 20 | / 20 |
+ 
+# Comments
+ 
+## Implementation
+ 
+To test your implementation, I have loaded your submitted model weights and ensured they generate images that are at least similar to those in your report for each of the three tasks. I have then retrained your models and confirmed they give similar results on retraining as they do when loaded --- e.g. testing if your submitted model was just a lucky run. 
+    Your model loaded without issue and gave results similar to your report images for all three tasks. Excellent work!
+ 
+    Your model re-trained without much issue and the resulting model generated images similar to those your submitted weights gave. Nice work on this! Your model architecture and training seems relatively stable.
+ 
+This seems like a reasonable implementation of the Conditional Variational Autoencoder. Your model architecture is well defined and seems sensible for the task at hand. That is to say, you have a reasonable number of layers for both the encoder and decoder models (half-models?). 
+ 
+    You have employed Convolutional-2D layers for the encoder models, which is sensible for a task based on image data. Convolutional layers preserve spatial structure better than dense layers, so they are well suited to image tasks. Good work!
+ 
+    You have employed Convolution-2D transpose layers for the decoder models. This is reasonable for such a task, since we are looking to reconstruct/generate image data and Convolutional-2D transpose layers keep the intermediate data in an image-like form. In particular, the calculations of these layers can improve image generation thanks to only local information being available at each step --- this can reduce noise and improve stability. However, the decoder model can also use dense layers. This is not as set-in-stone as it is for the encoder model, for which Convolutional-2D layers are almost always the norm.
+ 
+    Your use of regularization techniques (implemented as layers) is good to see! I would like to see discussion of these techniques in your report, and in particular some kind of reference to how they work, how they improve the model, and what would happen in this specific application if they were removed. This would show good understanding of why each technique is useful!
+ 
+    As always, your choice of hyperparameters is something that could be scrutinized. Why did you chose the number of layers that you did? What about the sizes of those layers? Did you consider carefully how the regularization techniques would interact? What about the optimizer itself --- your choice of optimizer algorithm and associated hyperparameters is just as if not more important than the model! Of course, for this assignment I do not demand as much experimentation as to finding the ``optimal'' value of these aspects... there simply isn't enough time to try all of the combinations! However, some discussion on these choices in your report would be good!
+ 
+Excellent documentation throughout. Very happy to see, and useful for describing your thought process throughout! Wonderful clean code!!
+ 
+Some of your code is duplicated between each file, such as your CVAE_trainer class, generate images function, and (most importantly) the model architecture definition. We could move this shared code to a single file and just import from there, which would make your code even cleaner.
+ 
+ 
+## Report
+ 
+Good introduction that specifies the assignment specification, your goals, and the model you have selected.
+ 
+Through Section 1, your description of the model architecture and the choices made for each model are well discussed and concise. Excellent work here! I can tell some serious work went in to this report! I have very little to say on this section --- you have done a spectacular job here!
+ 
+This continues through Section 1.4 to 1.6 discussing the tasks themselves --- well done!
+ 
+Table 1 is an excellent description of your specific model architectures for each task, and proves my point above that you could have extracted these definitions to a single shared file!
+ 
+Nice visualization of your model outputs in Figures 1 through 7. I achieved similar performances in my retraining.
+ 
+Excellent discussion of the differences between VAE and C-VAE! I have nothing significant to add to this, great work!
+ 
+My apologies for the relatively short feedback on your report --- you have done exceptionally well!! Congratulations :)
